@@ -13,26 +13,44 @@
             display: flex; justify-content: center; align-items: center;
             color: white; font-family: sans-serif; font-size: 24px; text-align: center;
             background: rgba(0, 0, 0, 0.8); cursor: pointer; z-index: 99;
+            transition: opacity 1s;
         }
     </style>
 </head>
 <body>
 
     <div id="guide" onclick="enableFullscreen()">
-        Chạm/Nhấn OK trên remote để bật Fullscreen
+        Chạm / Nhấn OK trên remote để bật Toàn màn hình
     </div>
 
     <div id="display-area"></div>
 
     <script>
-        // 1. Danh sách cấu hình ID -> Link media/slide tương ứng
+        // 1. DANH SÁCH BACKDROP (Đã hỗ trợ link Google Drive trực tiếp)
         const backdropDatabase = {
-            "bd1": "https://drive.google.com/file/d/1cpSZtJ1bi0AhH62xvZ_AO1Y3qdIMS7YE/view?usp=sharing",                // Link ảnh tĩnh
-            //"bd2": "https://i.imgur.com/example.gif",                // Link ảnh động GIF
-            "slide1": "https://docs.google.com/presentation/d/e/2PACX-1vT-tp-TLlX0zZ2EgOM3Uc0zUW0BbPX72VH_7DldMgPJDQRg8kgjxjhYOfAV5KH7Mg/pub?start=true&loop=true&delayms=3000" // Link Google Slides Embed
+            // Bạn có thể dán nguyên link chia sẻ Google Drive vào đây:
+            "bd1": "https://drive.google.com/file/d/1cpSZtJ1bi0AhH62xvZ_AO1Y3qdIMS7YE/view?usp=sharing",
+            "bd2": "https://i.imgur.com/example.gif",
+            "slide1": "https://docs.google.com/presentation/d/e/2PACX-1vT-tp-TLlX0zZ2EgOM3Uc0zUW0BbPX72VH_7DldMgPJDQRg8kgjxjhYOfAV5KH7Mg/pubembed?start=true&loop=true&delayms=3000"
         };
 
-        // 2. Trích xuất ID từ tham số URL (?id=...) hoặc từ đường dẫn (.../ID)
+        // 2. Hàm tự động biến đổi link Google Drive thành Link hiển thị ảnh thô (Direct View)
+        function processMediaUrl(url) {
+            if (!url) return null;
+            
+            // Nếu là link file Google Drive (không phải Google Slides)
+            if (url.includes('drive.google.com/file/d/')) {
+                const matches = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                if (matches && matches[1]) {
+                    const fileId = matches[1];
+                    // Chuyển sang URL CDN hiển thị trực tiếp ảnh/gif của Google
+                    return `https://lh3.googleusercontent.com/d/${fileId}`;
+                }
+            }
+            return url;
+        }
+
+        // 3. Trích xuất ID từ URL (?id=...) hoặc (.../ID)
         const urlParams = new URLSearchParams(window.location.search);
         let backdropId = urlParams.get('id');
         
@@ -42,27 +60,34 @@
         }
 
         const container = document.getElementById('display-area');
-        const mediaUrl = backdropDatabase[backdropId];
+        const rawUrl = backdropDatabase[backdropId];
+        const mediaUrl = processMediaUrl(rawUrl);
 
-        // 3. Hiển thị Media
+        // 4. Hiển thị Media
         if (mediaUrl) {
-            if (mediaUrl.includes('docs.google.com') || mediaUrl.includes('embed') || mediaUrl.includes('.html')) {
-                // Nếu là Slide/Trang web embed
-                container.innerHTML = `<iframe src="${mediaUrl}" class="fullscreen-element" allow="autoplay"></iframe>`;
+            if (rawUrl.includes('docs.google.com/presentation')) {
+                // Xử lý Google Slides (Mở trực tiếp chế độ Present trên TV)
+                const presentUrl = rawUrl.replace('/embed', '/present');
+                window.location.href = presentUrl; 
             } else {
-                // Nếu là Ảnh/GIF
-                container.innerHTML = `<img src="${mediaUrl}" class="fullscreen-element" alt="Backdrop">`;
+                // Xử lý Ảnh tĩnh / GIF / Ảnh Google Drive
+                container.innerHTML = `<img src="${mediaUrl}" class="fullscreen-element" alt="Backdrop" onerror="handleError()">`;
             }
         } else {
             document.getElementById('guide').innerText = "Không tìm thấy Backdrop tương ứng với ID này!";
         }
 
-        // 4. Hàm kích hoạt Toàn màn hình (Fullscreen API)
+        function handleError() {
+            document.getElementById('guide').innerText = "Lỗi tải ảnh! Hãy kiểm tra lại quyền 'Bất kỳ ai có liên kết' trên Google Drive.";
+            document.getElementById('guide').style.opacity = '1';
+        }
+
+        // 5. Kích hoạt Toàn màn hình
         function enableFullscreen() {
             const elem = document.documentElement;
             if (elem.requestFullscreen) {
                 elem.requestFullscreen();
-            } else if (elem.webkitRequestFullscreen) { /* Safari / TV Bro */
+            } else if (elem.webkitRequestFullscreen) {
                 elem.webkitRequestFullscreen();
             } else if (elem.msRequestFullscreen) {
                 elem.msRequestFullscreen();
@@ -70,7 +95,7 @@
             document.getElementById('guide').style.display = 'none';
         }
 
-        // Tự động ẩn thông báo sau 3 giây nếu người dùng không tương tác
+        // Tự động mờ thông báo sau 3 giây
         setTimeout(() => {
             const guide = document.getElementById('guide');
             if (guide && mediaUrl) guide.style.opacity = '0.3';
